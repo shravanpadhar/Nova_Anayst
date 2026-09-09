@@ -1,0 +1,33 @@
+# Governance policy enforced by tools/governance.py on every schema read and
+# every SQL query. This is the "Halo"-style layer: nothing here is advisory,
+# tools/governance.py mechanically enforces it before results reach the agent.
+
+policy_version: 1
+
+# Columns that can NEVER be selected, filtered on, or grouped by. Any SQL
+# referencing these (directly, via SELECT *, or via a subquery) is rejected
+# with a structured policy_violation before it reaches DuckDB.
+blocked_columns:
+  - table: customers
+    column: customer_unique_id
+    reason: >
+      Person-level identifier that re-identifies individuals across orders.
+      Only the order-scoped customer_id may be used for joins/aggregation.
+
+# Columns that are allowed in the schema and in COUNT/EXISTS-style usage but
+# whose VALUES are masked (redacted) before being returned to the agent or UI.
+masked_columns:
+  - table: reviews
+    column: review_comment_message
+    reason: Free-text field may contain names, contact info, or other PII typed by customers.
+    mask_strategy: redact  # replaced with "[REDACTED]" in results
+  - table: reviews
+    column: review_comment_title
+    reason: Free-text field may contain names or PII typed by customers.
+    mask_strategy: redact
+
+# Row/DML safety -- enforced independently of the column lists above.
+sql_policy:
+  allow_only: [SELECT, WITH]
+  deny_statements: [INSERT, UPDATE, DELETE, DROP, ALTER, CREATE, ATTACH, COPY, EXPORT, PRAGMA, CALL]
+  max_rows_returned: 5000

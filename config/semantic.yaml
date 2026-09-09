@@ -1,0 +1,100 @@
+# Semantic layer: maps business language to physical tables/columns and
+# defines certified metrics so the agent (and a human) share one vocabulary.
+
+tables:
+  orders:
+    description: One row per customer order. Grain: order_id.
+    primary_key: order_id
+    columns:
+      order_id: Unique order identifier
+      customer_id: FK to customers (order-scoped, not the person)
+      order_status: "delivered | shipped | canceled | processing | ..."
+      order_purchase_timestamp: When the order was placed
+      order_delivered_customer_date: When the customer actually received it
+      order_estimated_delivery_date: Promised delivery date
+
+  order_items:
+    description: One row per line item within an order. Grain: order_id + order_item_id.
+    primary_key: [order_id, order_item_id]
+    columns:
+      order_id: FK to orders
+      product_id: FK to products
+      seller_id: FK to sellers
+      price: Item price (BRL), excludes freight
+      freight_value: Shipping cost for this item (BRL)
+
+  payments:
+    description: Payment installments per order. An order can have multiple payment rows.
+    primary_key: [order_id, payment_sequential]
+    columns:
+      order_id: FK to orders
+      payment_type: "credit_card | boleto | voucher | debit_card"
+      payment_installments: Number of installments chosen
+      payment_value: Amount paid in this installment (BRL)
+
+  reviews:
+    description: Customer review per order. Grain: review_id.
+    primary_key: review_id
+    columns:
+      order_id: FK to orders
+      review_score: 1-5 star rating
+      review_comment_message: Free-text comment (governed -- see governance.yaml)
+
+  customers:
+    description: Order-scoped customer records. customer_id is per-order; customer_unique_id
+      identifies the actual person across orders and is governed.
+    primary_key: customer_id
+    columns:
+      customer_id: Order-scoped customer key (safe to use for joins)
+      customer_unique_id: Person-level identifier (governed -- see governance.yaml)
+      customer_city: City name
+      customer_state: Two-letter Brazilian state code
+
+  products:
+    description: Product catalog. Grain: product_id.
+    primary_key: product_id
+    columns:
+      product_id: Unique product identifier
+      product_category_name: Category in Portuguese, join category_translation for English
+
+  sellers:
+    description: Marketplace sellers. Grain: seller_id.
+    primary_key: seller_id
+    columns:
+      seller_id: Unique seller identifier
+      seller_city: City name
+      seller_state: Two-letter Brazilian state code
+
+  geolocation:
+    description: Zip-code-prefix to lat/lng lookup for Brazil.
+    primary_key: geolocation_zip_code_prefix
+    columns:
+      geolocation_zip_code_prefix: First 5 digits of a Brazilian zip code
+      geolocation_lat: Latitude
+      geolocation_lng: Longitude
+
+  category_translation:
+    description: Maps Portuguese product category names to English.
+    primary_key: product_category_name
+    columns:
+      product_category_name: Category name in Portuguese
+      product_category_name_english: Category name in English
+
+# Certified metrics -- the agent should prefer these definitions over inventing
+# ad hoc SQL when a question matches one of these business terms.
+metrics:
+  gmv:
+    definition: "SUM(order_items.price + order_items.freight_value) for orders where order_status = 'delivered'"
+    business_term: Gross Merchandise Value
+  order_count:
+    definition: "COUNT(DISTINCT orders.order_id)"
+    business_term: Number of orders
+  avg_review_score:
+    definition: "AVG(reviews.review_score)"
+    business_term: Average customer satisfaction (1-5 stars)
+  on_time_delivery_rate:
+    definition: "AVG(CASE WHEN order_delivered_customer_date <= order_estimated_delivery_date THEN 1.0 ELSE 0.0 END) for delivered orders"
+    business_term: Share of orders delivered by the promised date
+  repeat_customer_rate:
+    definition: "share of customer_unique_id values with more than one order (GOVERNED -- see governance.yaml)"
+    business_term: Fraction of distinct people who ordered more than once

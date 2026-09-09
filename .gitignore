@@ -1,0 +1,15 @@
+.env
+data/*.duckdb
+data/*.csv
+data/raw/
+data/uploads/
+__pycache__/
+**/__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+**/.pytest_cache/
+evals/RESULTS.md
+*.egg-info/
+.DS_Store

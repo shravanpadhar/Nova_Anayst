@@ -10,6 +10,9 @@ governance policy for it, and analyze that instead. Built as a portfolio demo
 aimed squarely at how NuoData thinks about agentic analytics: MCP-native
 tools, an explicit governance layer, and a swappable LLM underneath.
 
+
+**Live Demo:** [Nova Analyst](https://nova-anayst-auwl.onrender.com)
+
 ---
 
 ## The problem, framed against NuoData
